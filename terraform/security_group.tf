@@ -51,12 +51,12 @@ resource "aws_security_group" "ecs_sg" {
 }
 
 # Ingress rule for ECS service
-# 8080と8070ポート
+# 3000と8070ポート
 resource "aws_security_group_rule" "ecs_in_frontend_port8080" {
   security_group_id        = aws_security_group.ecs_sg.id
   type                     = "ingress"
-  from_port                = 8080 # ポート番号
-  to_port                  = 8080
+  from_port                = 3000 # ポート番号
+  to_port                  = 3000
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.alb_sg.id
 }
