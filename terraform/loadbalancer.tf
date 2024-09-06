@@ -7,7 +7,7 @@ resource "aws_lb" "alb" {
   subnets            = [aws_subnet.public_subnet1.id, aws_subnet.public_subnet2.id]
   # enable_deletion_protection = false これは、削除保護を無効にするための設定です。
   enable_http2 = true
-  
+
 }
 
 # IP Target Group（仮）TODO
@@ -25,8 +25,6 @@ resource "aws_lb_listener" "listener_http" {
   load_balancer_arn = aws_lb.alb.arn
   port              = "80"
   protocol          = "HTTP"
-  ssl_policy = "ELBSecurityPolicy-2016-08"
-
 
   default_action {
     type             = "forward"
@@ -40,6 +38,7 @@ resource "aws_lb_listener" "listener_https" {
   port              = "443"
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-2016-08"
+  certificate_arn   = aws_acm_certificate.acm_cert.arn
 
   default_action {
     type             = "forward"
