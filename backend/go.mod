@@ -1,4 +1,4 @@
-module st-ecs
+module backend
 
 go 1.20
 
