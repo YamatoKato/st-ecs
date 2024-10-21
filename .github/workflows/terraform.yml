@@ -1,0 +1,76 @@
+name: 'Terraform'
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  OIDC_ARN: arn:aws:iam::485368632596:role/GitHubActionsOIDC
+
+permissions:
+  id-token: write # OIDC による認証のため
+  contents: read # Terraform の各種コマンド実行時に、リポジトリのコンテンツを参照するため
+  pull-requests: write # terraform plan と terraform apply の実行結果を Pull Request にコメントするため
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      # GitHub にコメント通知する CLI ツール
+      - name: Setup tfcmt
+        env:
+          TFCMT_VERSION: v4.0.0
+        run: |
+          wget "https://github.com/suzuki-shunsuke/tfcmt/releases/download/${TFCMT_VERSION}/tfcmt_linux_amd64.tar.gz" -O /tmp/tfcmt.tar.gz
+          tar xzf /tmp/tfcmt.tar.gz -C /tmp
+          mv /tmp/tfcmt /usr/local/bin
+          tfcmt --version
+
+      # OIDC による AWS 認証を行う
+      - name: Assume Role
+        uses: aws-actions/configure-aws-credentials@v1-node16
+        with:
+          role-to-assume: ${{ env.OIDC_ARN }}
+          aws-region: ap-northeast-1
+
+      # HCLファイルがフォーマットされているかチェックする
+      - name: Terraform Format
+        id: fmt
+        run: terraform fmt -check
+
+      # Terraform の初期化
+      - name: Terraform Init
+        id: init
+        run: terraform init
+
+      # HCL の記述が正しいかどうか構文チェックする
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      # terraform plan の結果を Pull Request のコメントとして追加する
+      - name: Terraform Plan
+        id: plan
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: tfcmt plan -patch -- terraform plan -no-color -input=false -out=tfplan
+
+      # terraform plan が失敗したときに、ワークフローから抜ける
+      - name: Terraform Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+      # mainブランチに push されたときに terraform apply を実行する
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: tfcmt apply -- terraform apply -auto-approve -input=false
